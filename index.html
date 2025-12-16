@@ -1,16 +1,4 @@
-
 <!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="UTF-8">
-    <title>Renklendirilebilir Ülke Haritası.2</title>
-    
-
-  </head>
-    
-  <body>
-  <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8" />
@@ -22,7 +10,6 @@
         crossorigin=""
     />
     <style>
-        /* CSS kodları önceki haliyle aynı */
         html, body {
             margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: Arial, sans-serif;
             display: flex;
@@ -32,20 +19,18 @@
             flex-grow: 1;
             height: 100vh;
         }
-        /* SAĞ PANEL GİZLEME MANTIĞI İÇİN EKLENDİ */
         body.share-view #sidebar {
             display: none;
         }
         body.share-view #map {
-            width: 100vw; /* Tam genişlik alması için */
+            width: 100vw;
         }
-        /* HARİTA BAŞLIĞI İÇİN EKLENDİ */
         #mapTitle {
             position: absolute;
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 1000; /* Haritanın üzerinde olması için */
+            z-index: 1000;
             background: rgba(255, 255, 255, 0.9);
             padding: 8px 15px;
             border-radius: 5px;
@@ -56,14 +41,13 @@
             max-width: 80%;
             text-align: center;
         }
-
         #sidebar {
             width: 320px;
             background: #f8f9fa;
             border-left: 1px solid #ccc;
             padding: 10px;
             overflow-y: auto;
-            flex-shrink: 0; /* Küçülmesini engelle */
+            flex-shrink: 0;
         }
         h2 {
             font-size: 18px;
@@ -83,7 +67,6 @@
             font-size: 14px;
             cursor: pointer;
         }
-        /* Başlık Input Stili */
         #mapTitleInput {
             width: calc(100% - 12px);
             padding: 6px;
@@ -92,7 +75,6 @@
             margin-top: 5px;
             font-size: 14px;
         }
-        /* Paylaş Butonu Stili */
         #shareButton {
             width: 100%;
             padding: 10px;
@@ -109,7 +91,6 @@
         #shareButton:hover {
             background-color: #0056b3;
         }
-        /* ... (Geri kalan CSS aynı) ... */
         #info {
             margin-top: 10px;
             font-size: 14px;
@@ -247,7 +228,7 @@
         
         <div id="paintedCountriesList">
               <h3>Ülke İsimlerini Düzenle</h3>
-              </div>
+        </div>
 
         <button id="shareButton">🔗 Haritayı Paylaş (URL Oluştur)</button>
 
@@ -260,11 +241,9 @@
     <script>
         const map = L.map('map').setView([20, 0], 2);
         
-        // Katman Grupları
         const labelsGroup = L.layerGroup().addTo(map);
         const polygonsGroup = L.layerGroup().addTo(map);
 
-        // OSM Altlık Katmanı tanımı
         const osmTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '© OpenStreetMap contributors'
@@ -274,7 +253,6 @@
         const info = document.getElementById('info');
         
         const paintedCountriesList = document.getElementById('paintedCountriesList');
-        // YENİ ELEMANLAR
         const mapTitleInput = document.getElementById('mapTitleInput');
         const mapTitleDisplay = document.getElementById('mapTitle');
         const shareButton = document.getElementById('shareButton');
@@ -286,22 +264,17 @@
         const colorLegends = {}; 
         let currentBasemapSelection = 'osmBasemap';
 
-        // URL Kontrolü: Paylaşım modunda mıyız?
         const urlParams = new URLSearchParams(window.location.search);
         const isShareView = urlParams.has('config');
 
-        // Paylaşım modunda değilsek Harita Başlık Alanını göster
         if (!isShareView) {
             mapTitleDisplay.style.display = 'block';
         } else {
-            // Paylaşım modundaysak sağ paneli ve diğer kontrol butonlarını gizle
             document.body.classList.add('share-view');
-            // İndirme kontrolünü gizle (veya kaldır)
             const downloadControlElement = document.querySelector('.leaflet-control-download');
             if(downloadControlElement) downloadControlElement.parentElement.remove();
         }
 
-        // Lejant Control (Aynı Kaldı)
         const legendControl = L.Control.extend({
             options: { position: 'bottomright' },
             onAdd: function (map) {
@@ -314,7 +287,6 @@
         map.addControl(new legendControl());
         const legendContainer = document.getElementById('legendContainer');
 
-        // İndirme Kontrolü (Sol Alt) - Paylaşım modunda değilsek ekle
         if (!isShareView) {
             const DownloadControl = L.Control.extend({
                 options: { position: 'bottomleft' },
@@ -328,35 +300,37 @@
                 }
             });
             map.addControl(new DownloadControl());
-            const snapshotButton = document.getElementById('snapshotButton');
         }
 
-
-        /* --- Başlık Güncelleme İşlevi (YENİ) --- */
         mapTitleInput.addEventListener('input', () => {
             const title = mapTitleInput.value.trim() || "Harita Başlığı";
             mapTitleDisplay.textContent = title;
         });
-        mapTitleInput.dispatchEvent(new Event('input')); // Başlangıç değerini ayarla
+        mapTitleInput.dispatchEvent(new Event('input'));
 
+        // UTF-8 uyumlu Base64 encode/decode
+        function base64EncodeUnicode(str) {
+          return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+            function(match, p1) {
+              return String.fromCharCode('0x' + p1);
+            }));
+        }
 
-        /* --- Paylaş İşlevi (YENİ) --- */
+        function base64DecodeUnicode(str) {
+          return decodeURIComponent(Array.prototype.map.call(atob(str), function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+        }
 
-        /**
-         * Harita durumunu (Boyanan Ülkeler, Renk Açıklamaları, Başlık, Görünüm) JSON olarak kaydeder.
-         * @returns {string} Base64 kodlanmış sıkıştırılmış JSON dizesi.
-         */
         function saveMapConfig() {
             const config = {
-                // Sadece boyanan ülkeleri kaydet: { ÜlkeID: { color: "#hex", name: "Etiket Adı" } }
                 countries: Object.keys(selectedCountryLayers).reduce((acc, id) => {
                     const country = selectedCountryLayers[id];
-                    // name, orijinal isimden farklıysa kaydet. (Daha kısa URL için)
                     const name = country.name !== country.originalName ? country.name : undefined;
-                    acc[id] = { color: country.color, name };
+                    if(name) acc[id] = { color: country.color, name };
+                    else acc[id] = { color: country.color };
                     return acc;
                 }, {}),
-                // Lejant açıklamalarını kaydet: { "#hex": "Açıklama" }
                 legends: Object.keys(colorLegends).reduce((acc, color) => {
                     if (colorLegends[color].label) acc[color] = colorLegends[color].label;
                     return acc;
@@ -368,20 +342,14 @@
             };
             
             const jsonString = JSON.stringify(config);
-            // URL'yi kısa tutmak için Base64 kodlama kullanılır
-            return btoa(jsonString); 
+            return base64EncodeUnicode(jsonString);
         }
 
-        /**
-         * Base64 kodlanmış konfigürasyonu çözerek haritayı yükler. (Yükleme işlevi içine entegre edilecek)
-         * @param {string} encodedConfig - Base64 kodlanmış konfigürasyon dizesi.
-         */
         function loadMapConfig(encodedConfig) {
             try {
-                const jsonString = atob(encodedConfig);
+                const jsonString = base64DecodeUnicode(encodedConfig);
                 const config = JSON.parse(jsonString);
                 
-                // Başlık
                 if (config.title) {
                     mapTitleDisplay.textContent = config.title;
                     mapTitleDisplay.style.display = 'block';
@@ -389,28 +357,23 @@
                     mapTitleDisplay.style.display = 'none';
                 }
 
-                // Görünüm
                 if (config.view) {
-                    // updateMapLayers çağrılırken ülkelerin boyanması için countriesGeoJSON'un yüklenmesi beklenmeli.
                     currentBasemapSelection = config.view;
                     const radio = document.getElementById(config.view);
                     if (radio) radio.checked = true;
                 }
 
-                // Harita Merkezi ve Zoom
                 if (config.center && config.zoom) {
                     const [lat, lng] = config.center.split(',');
                     map.setView([parseFloat(lat), parseFloat(lng)], parseInt(config.zoom));
                 }
 
-                // Lejant Açıklamaları
                 if (config.legends) {
                     for (const color in config.legends) {
                         colorLegends[color] = { label: config.legends[color], countries: [] };
                     }
                 }
                 
-                // Ülkeleri Boya (GeoJSON yüklendikten sonra yapılacak)
                 return config.countries || {};
 
             } catch (error) {
@@ -419,8 +382,6 @@
             }
         }
 
-
-        // Paylaş butonuna tıklandığında
         if (!isShareView) {
             shareButton.addEventListener('click', () => {
                 const encodedConfig = saveMapConfig();
@@ -435,10 +396,6 @@
             });
         }
 
-
-        /* --- Harita Yükleme (Güncellendi) --- */
-
-        // ... (Diğer yardımcı fonksiyonlar aynı kaldı) ...
         function getCountryName(feature) {
              return feature.properties.ADMIN || feature.properties.NAME || feature.properties.name || "Bilinmeyen";
         }
@@ -468,9 +425,7 @@
              return turf.centroid(feature).geometry.coordinates;
         }
 
-
         function updateCountryEditList() {
-             // ... (Aynı kaldı) ...
              paintedCountriesList.innerHTML = '<h3>Ülke İsimlerini Düzenle</h3>';
              
              for (const countryId in selectedCountryLayers) {
@@ -523,7 +478,6 @@
         }
 
         function updateLegend() {
-            // ... (Aynı kaldı) ...
              legendContainer.innerHTML = '<div class="legend-title">Boyanan Renkler ve Açıklamalar</div>';
 
              const uniqueColors = {};
@@ -565,12 +519,11 @@
              }
         }
         
-        function addOrUpdateSelectedCountry(feature, fillColor, displayName) { // fillColor ve displayName parametreleri eklendi
+        function addOrUpdateSelectedCountry(feature, fillColor, displayName) {
             const countryId = getCountryId(feature); 
             const originalName = getCountryName(feature); 
             const color = fillColor || colorPicker.value;
             
-            // Eğer displayName verilmediyse, mevcut düzenlenmiş adı kullan veya orijinal adı
             const currentDisplayName = displayName || (selectedCountryLayers[countryId] ? selectedCountryLayers[countryId].name : originalName);
 
             if (selectedCountryLayers[countryId]) {
@@ -595,7 +548,7 @@
             const label = L.marker(latlng, {
                 icon: L.divIcon({
                     className: 'country-label',
-                    html: currentDisplayName, // Mevcut adı kullan
+                    html: currentDisplayName,
                     iconSize: [100, 20],
                     iconAnchor: [50, 10]
                 }),
@@ -611,11 +564,10 @@
             };
             
             updateLegend();
-            if (!isShareView) updateCountryEditList(); // Paylaşım modunda listeyi güncelleme
+            if (!isShareView) updateCountryEditList();
             
             if (!isShareView) info.textContent = `${originalName} seçildi ve renklendirildi. Toplam ${Object.keys(selectedCountryLayers).length} farklı ülke boyandı.`;
         }
-
 
         function updateMapLayers(selection) {
              currentBasemapSelection = selection;
@@ -623,11 +575,17 @@
              if (selection === 'osmBasemap') {
                  if (!map.hasLayer(osmTileLayer)) map.addLayer(osmTileLayer);
                  document.getElementById('map').style.backgroundColor = ''; 
-                 if (!isShareView) snapshotButton.innerHTML = '🖼️ Haritayı İndir (PNG)';
+                 if (!isShareView) {
+                     const snapshotButton = document.getElementById('snapshotButton');
+                     if(snapshotButton) snapshotButton.innerHTML = '🖼️ Haritayı İndir (PNG)';
+                 }
              } else {
                  if (map.hasLayer(osmTileLayer)) map.removeLayer(osmTileLayer);
                  document.getElementById('map').style.backgroundColor = '#A2C5E8'; 
-                 if (!isShareView) snapshotButton.innerHTML = '✂️ Ekran Alıntısı İçin Tıkla';
+                 if (!isShareView) {
+                     const snapshotButton = document.getElementById('snapshotButton');
+                     if(snapshotButton) snapshotButton.innerHTML = '✂️ Ekran Alıntısı İçin Tıkla';
+                 }
              }
 
              if (selection === 'grayBorders') {
@@ -648,7 +606,6 @@
              }
         }
         
-        // Sadece ana görünümde harita seçim radyo butonlarını dinle
         if (!isShareView) {
             document.querySelectorAll('input[name="basemap"]').forEach(radio => {
                 radio.addEventListener('change', (e) => {
@@ -667,8 +624,6 @@
              );
         };
 
-
-        // GeoJSON yükleme ve harita başlatma
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
             .then(res => res.json())
             .then(data => {
@@ -683,19 +638,16 @@
                 }
 
                 if (Object.keys(countriesToPaint).length > 0) {
-                    // Paylaşım modunda, kayıtlı konfigürasyondan ülkeleri boya
                     countriesGeoJSON.features.forEach(feature => {
                         const countryId = getCountryId(feature);
                         const config = countriesToPaint[countryId];
                         if (config) {
-                            // name varsa onu kullan, yoksa orijinalini kullanacak (addOrUpdateSelectedCountry içinde)
                             addOrUpdateSelectedCountry(feature, config.color, config.name); 
                         }
                     });
-                    updateMapLayers(currentBasemapSelection); // config'den gelen view'i uygula
+                    updateMapLayers(currentBasemapSelection);
 
                 } else {
-                    // Normal modda
                     if (!isShareView) info.textContent = "Renk seçin ve haritadan ülkeye tıklayın.";
                     updateMapLayers(currentBasemapSelection); 
                 }
@@ -706,7 +658,6 @@
                 if (!isShareView) info.textContent = "Harita yüklenemedi.";
             });
         
-        /* --- Tıklama Olayı (Sadece normal modda aktif) --- */
         if (!isShareView) {
             map.on('click', e => {
                 if (!countriesGeoJSON) return;
@@ -738,20 +689,12 @@
                      return;
                 }
                 
-                // Normal renklendirme (renk seçiciden gelen renkle)
                 addOrUpdateSelectedCountry(foundFeature, selectedColor);
             });
-        }
-        
-        if (!isShareView) {
+
             updateLegend();
             updateCountryEditList();
         }
     </script>
 </body>
 </html>
-    
-  </body>
-  
-</html>
-
