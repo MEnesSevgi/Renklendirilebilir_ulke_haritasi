@@ -327,8 +327,8 @@
                 countries: Object.keys(selectedCountryLayers).reduce((acc, id) => {
                     const country = selectedCountryLayers[id];
                     const name = country.name !== country.originalName ? country.name : undefined;
-                    if(name) acc[id] = { color: country.color, name };
-                    else acc[id] = { color: country.color };
+                    if(name) acc[id] = { colors: country.colors, name };
+                    else acc[id] = { colors: country.colors };
                     return acc;
                 }, {}),
                 legends: Object.keys(colorLegends).reduce((acc, color) => {
@@ -482,11 +482,13 @@
 
              const uniqueColors = {};
              for (const id in selectedCountryLayers) {
-                 const color = selectedCountryLayers[id].color;
-                 if (!uniqueColors[color]) {
-                     const existingLabel = colorLegends[color] ? colorLegends[color].label : '';
-                     uniqueColors[color] = existingLabel;
-                 }
+                 const colors = selectedCountryLayers[id].colors;
+                 colors.forEach(color => {
+                   if (!uniqueColors[color]) {
+                       const existingLabel = colorLegends[color] ? colorLegends[color].label : '';
+                       uniqueColors[color] = existingLabel;
+                   }
+                 });
              }
              
              for (const color in uniqueColors) {
@@ -518,30 +520,98 @@
                  legendContainer.appendChild(itemDiv);
              }
         }
-        
+
+        // Çok renkli destekli güncellenmiş fonksiyon
         function addOrUpdateSelectedCountry(feature, fillColor, displayName) {
-            const countryId = getCountryId(feature); 
-            const originalName = getCountryName(feature); 
+            const countryId = getCountryId(feature);
+            const originalName = getCountryName(feature);
             const color = fillColor || colorPicker.value;
-            
+
             const currentDisplayName = displayName || (selectedCountryLayers[countryId] ? selectedCountryLayers[countryId].name : originalName);
 
+            // Eğer ülke zaten seçilmişse, renk dizisine ekle (aynı renk varsa ekleme)
             if (selectedCountryLayers[countryId]) {
-                polygonsGroup.removeLayer(selectedCountryLayers[countryId].polygon);
-                labelsGroup.removeLayer(selectedCountryLayers[countryId].label);
+                // Yeni renk yoksa ekle
+                if (!selectedCountryLayers[countryId].colors.includes(color)) {
+                    selectedCountryLayers[countryId].colors.push(color);
+                }
+            } else {
+                // Yeni ülke için renk dizisi oluştur
+                selectedCountryLayers[countryId] = {
+                    colors: [color],
+                    name: currentDisplayName,
+                    originalName: originalName,
+                    polygons: [], // çoklu renkli poligonlar için
+                    label: null
+                };
             }
 
-            const polygon = L.geoJSON(feature, {
-                style: {
-                    fillColor: color,
-                    color: 'white', 
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.7,
-                    dashArray: ''
-                }
-            }).addTo(polygonsGroup);
+            // Önce eski poligonları kaldır
+            if (selectedCountryLayers[countryId].polygons.length > 0) {
+                selectedCountryLayers[countryId].polygons.forEach(poly => polygonsGroup.removeLayer(poly));
+                selectedCountryLayers[countryId].polygons = [];
+            }
+            if (selectedCountryLayers[countryId].label) {
+                labelsGroup.removeLayer(selectedCountryLayers[countryId].label);
+                selectedCountryLayers[countryId].label = null;
+            }
 
+            const colors = selectedCountryLayers[countryId].colors;
+            const geom = feature.geometry;
+
+            // Çokgeni yatay olarak renk sayısına göre dilimleyecek yardımcı fonksiyon
+            function splitPolygonHorizontally(feature, parts) {
+                const resultPolygons = [];
+                const bbox = turf.bbox(feature); // [minX, minY, maxX, maxY]
+                const minY = bbox[1];
+                const maxY = bbox[3];
+                const height = maxY - minY;
+                const step = height / parts;
+
+                for (let i = 0; i < parts; i++) {
+                    const sliceMinY = minY + i * step;
+                    const sliceMaxY = sliceMinY + step;
+
+                    // Dikey kutu poligonu (slice)
+                    const slicePoly = turf.bboxPolygon([bbox[0], sliceMinY, bbox[2], sliceMaxY]);
+
+                    // feature ile kesişim al
+                    const intersection = turf.intersect(feature, slicePoly);
+
+                    if (intersection) {
+                        resultPolygons.push(intersection);
+                    }
+                }
+                return resultPolygons;
+            }
+
+            // Poligonları oluştur
+            let polygonsToDraw = [];
+
+            if (geom.type === "MultiPolygon" || geom.type === "Polygon") {
+                polygonsToDraw = splitPolygonHorizontally(feature, colors.length);
+            } else {
+                // Geometri tipi desteklenmiyorsa tüm poligon tek renk
+                polygonsToDraw = [feature];
+            }
+
+            // Her parçayı farklı renkte çiz
+            polygonsToDraw.forEach((polyFeature, index) => {
+                const polyColor = colors[index] || colors[colors.length - 1];
+                const polygonLayer = L.geoJSON(polyFeature, {
+                    style: {
+                        fillColor: polyColor,
+                        color: 'white',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.7,
+                        dashArray: ''
+                    }
+                }).addTo(polygonsGroup);
+                selectedCountryLayers[countryId].polygons.push(polygonLayer);
+            });
+
+            // Etiket oluştur
             const centroidCoords = getLargestPolygonCentroid(feature);
             const latlng = [centroidCoords[1], centroidCoords[0]];
 
@@ -555,18 +625,13 @@
                 interactive: false
             }).addTo(labelsGroup);
 
-            selectedCountryLayers[countryId] = { 
-                polygon, 
-                label, 
-                color: color, 
-                name: currentDisplayName, 
-                originalName: originalName 
-            };
-            
+            selectedCountryLayers[countryId].label = label;
+            selectedCountryLayers[countryId].name = currentDisplayName;
+
             updateLegend();
             if (!isShareView) updateCountryEditList();
-            
-            if (!isShareView) info.textContent = `${originalName} seçildi ve renklendirildi. Toplam ${Object.keys(selectedCountryLayers).length} farklı ülke boyandı.`;
+
+            if (!isShareView) info.textContent = `${originalName} seçildi ve renklendirildi. Toplam ${Object.keys(selectedCountryLayers).length} farklı ülke boyandı. (Renk sayısı: ${colors.length})`;
         }
 
         function updateMapLayers(selection) {
@@ -642,7 +707,14 @@
                         const countryId = getCountryId(feature);
                         const config = countriesToPaint[countryId];
                         if (config) {
-                            addOrUpdateSelectedCountry(feature, config.color, config.name); 
+                            // Çoklu renk desteği için colors dizisi bekleniyor
+                            if (config.colors && Array.isArray(config.colors)) {
+                                config.colors.forEach(color => {
+                                  addOrUpdateSelectedCountry(feature, color, config.name);
+                                });
+                            } else if (config.color) {
+                                addOrUpdateSelectedCountry(feature, config.color, config.name);
+                            }
                         }
                     });
                     updateMapLayers(currentBasemapSelection);
