@@ -326,6 +326,7 @@
   mapTitleInput.addEventListener('input', () => {
     const title = mapTitleInput.value.trim() || "Harita Başlığı";
     mapTitleDisplay.textContent = title;
+    updateShareLink();
   });
   mapTitleInput.dispatchEvent(new Event('input'));
 
@@ -396,6 +397,13 @@
     }
   }
 
+  function updateShareLink() {
+    const encodedConfig = saveMapConfig();
+    const shareURL = window.location.origin + window.location.pathname + '?config=' + encodedConfig;
+    // Otomatik panoya kopyalama isteğe bağlıdır, burda konsola yazıyoruz
+    console.log('Güncel paylaşım linki:', shareURL);
+  }
+
   shareButton.addEventListener('click', () => {
     const encodedConfig = saveMapConfig();
     const shareURL = window.location.origin + window.location.pathname + '?config=' + encodedConfig;
@@ -464,6 +472,7 @@
           marker.setIcon(newIcon);
         }
         info.textContent = `${country.originalName} için etiket "${newName}" olarak güncellendi.`;
+        updateShareLink();
       });
       itemDiv.appendChild(label);
       itemDiv.appendChild(input);
@@ -513,6 +522,7 @@
       input.addEventListener('input', e => {
         if (!colorLegends[color]) { colorLegends[color] = { label: '', countries: [] }; }
         colorLegends[color].label = e.target.value;
+        updateShareLink();
       });
       if (!colorLegends[color]) {
         colorLegends[color] = { label: existingLabel, countries: [] };
@@ -614,6 +624,7 @@
 
     updateLegend();
     if (!isShareView) updateCountryEditList();
+    updateShareLink();
 
     if (!isShareView) info.textContent = `${originalName} seçildi ve renklendirildi. Toplam ${Object.keys(selectedCountryLayers).length} farklı ülke boyandı. (Renk sayısı: ${colors.length})`;
   }
@@ -658,6 +669,7 @@
     document.querySelectorAll('input[name="basemap"]').forEach(radio => {
       radio.addEventListener('change', e => {
         updateMapLayers(e.target.id);
+        updateShareLink();
       });
     });
   }
@@ -741,11 +753,13 @@
 
           checkbox.addEventListener('change', () => {
             updateMapLayers();
+            updateShareLink();
           });
         });
 
         osmCheckbox.addEventListener('change', () => {
           updateMapLayers();
+          updateShareLink();
         });
 
         function updateMapLayers() {
