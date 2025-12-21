@@ -253,34 +253,29 @@
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
     <script>
-        // Harita oluşturma ve temel katmanlar
         const map = L.map('map').setView([20, 0], 2);
 
         const labelsGroup = L.layerGroup().addTo(map);
         const polygonsGroup = L.layerGroup().addTo(map);
 
-        // OpenStreetMap altlık
         const osmTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '© OpenStreetMap contributors'
         });
 
-        // Renkli GeoJSON katmanları için grup (başlangıçta boş)
         const geojsonLayersGroup = L.layerGroup();
 
         const colorPicker = document.getElementById('colorPicker');
         const info = document.getElementById('info');
-        
         const paintedCountriesList = document.getElementById('paintedCountriesList');
         const mapTitleInput = document.getElementById('mapTitleInput');
         const mapTitleDisplay = document.getElementById('mapTitle');
         const shareButton = document.getElementById('shareButton');
 
         let countriesGeoJSON = null;
-        let grayBordersLayer = null; 
-        
+
         const selectedCountryLayers = {};
-        const colorLegends = {}; 
+        const colorLegends = {};
         let currentBasemapSelection = 'osmBasemap';
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -327,7 +322,6 @@
         });
         mapTitleInput.dispatchEvent(new Event('input'));
 
-        // UTF-8 uyumlu Base64 encode/decode
         function base64EncodeUnicode(str) {
             return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
                 function(match, p1) {
@@ -399,19 +393,17 @@
             }
         }
 
-        if (!isShareView) {
-            shareButton.addEventListener('click', () => {
-                const encodedConfig = saveMapConfig();
-                const shareURL = window.location.origin + window.location.pathname + '?config=' + encodedConfig;
+        shareButton.addEventListener('click', () => {
+            const encodedConfig = saveMapConfig();
+            const shareURL = window.location.origin + window.location.pathname + '?config=' + encodedConfig;
 
-                navigator.clipboard.writeText(shareURL).then(() => {
-                    alert('Paylaşım bağlantısı panoya kopyalandı:\n' + shareURL);
-                }).catch(err => {
-                    console.error('Bağlantı kopyalanamadı:', err);
-                    alert('Bağlantı oluşturuldu (Panoya kopyalanamadı, elle kopyalayın):\n' + shareURL);
-                });
+            navigator.clipboard.writeText(shareURL).then(() => {
+                alert('Paylaşım bağlantısı panoya kopyalandı:\n' + shareURL);
+            }).catch(err => {
+                console.error('Bağlantı kopyalanamadı:', err);
+                alert('Bağlantı oluşturuldu (Panoya kopyalanamadı, elle kopyalayın):\n' + shareURL);
             });
-        }
+        });
 
         function getCountryName(feature) {
              return feature.properties.ADMIN || feature.properties.NAME || feature.properties.name || "Bilinmeyen";
@@ -538,7 +530,6 @@
              }
         }
 
-        // Çok renkli destekli güncellenmiş fonksiyon
         function addOrUpdateSelectedCountry(feature, fillColor, displayName) {
             const countryId = getCountryId(feature);
             const originalName = getCountryName(feature);
@@ -546,24 +537,20 @@
 
             const currentDisplayName = displayName || (selectedCountryLayers[countryId] ? selectedCountryLayers[countryId].name : originalName);
 
-            // Eğer ülke zaten seçilmişse, renk dizisine ekle (aynı renk varsa ekleme)
             if (selectedCountryLayers[countryId]) {
-                // Yeni renk yoksa ekle
                 if (!selectedCountryLayers[countryId].colors.includes(color)) {
                     selectedCountryLayers[countryId].colors.push(color);
                 }
             } else {
-                // Yeni ülke için renk dizisi oluştur
                 selectedCountryLayers[countryId] = {
                     colors: [color],
                     name: currentDisplayName,
                     originalName: originalName,
-                    polygons: [], // çoklu renkli poligonlar için
+                    polygons: [],
                     label: null
                 };
             }
 
-            // Önce eski poligonları kaldır
             if (selectedCountryLayers[countryId].polygons.length > 0) {
                 selectedCountryLayers[countryId].polygons.forEach(poly => polygonsGroup.removeLayer(poly));
                 selectedCountryLayers[countryId].polygons = [];
@@ -576,10 +563,9 @@
             const colors = selectedCountryLayers[countryId].colors;
             const geom = feature.geometry;
 
-            // Çokgeni yatay olarak renk sayısına göre dilimleyecek yardımcı fonksiyon
             function splitPolygonHorizontally(feature, parts) {
                 const resultPolygons = [];
-                const bbox = turf.bbox(feature); // [minX, minY, maxX, maxY]
+                const bbox = turf.bbox(feature);
                 const minY = bbox[1];
                 const maxY = bbox[3];
                 const height = maxY - minY;
@@ -588,13 +574,8 @@
                 for (let i = 0; i < parts; i++) {
                     const sliceMinY = minY + i * step;
                     const sliceMaxY = sliceMinY + step;
-
-                    // Dikey kutu poligonu (slice)
                     const slicePoly = turf.bboxPolygon([bbox[0], sliceMinY, bbox[2], sliceMaxY]);
-
-                    // feature ile kesişim al
                     const intersection = turf.intersect(feature, slicePoly);
-
                     if (intersection) {
                         resultPolygons.push(intersection);
                     }
@@ -602,17 +583,14 @@
                 return resultPolygons;
             }
 
-            // Poligonları oluştur
             let polygonsToDraw = [];
 
             if (geom.type === "MultiPolygon" || geom.type === "Polygon") {
                 polygonsToDraw = splitPolygonHorizontally(feature, colors.length);
             } else {
-                // Geometri tipi desteklenmiyorsa tüm poligon tek renk
                 polygonsToDraw = [feature];
             }
 
-            // Her parçayı farklı renkte çiz
             polygonsToDraw.forEach((polyFeature, index) => {
                 const polyColor = colors[index] || colors[colors.length - 1];
                 const polygonLayer = L.geoJSON(polyFeature, {
@@ -628,7 +606,6 @@
                 selectedCountryLayers[countryId].polygons.push(polygonLayer);
             });
 
-            // Etiket oluştur
             const centroidCoords = getLargestPolygonCentroid(feature);
             const latlng = [centroidCoords[1], centroidCoords[0]];
 
@@ -651,22 +628,20 @@
             if (!isShareView) info.textContent = `${originalName} seçildi ve renklendirildi. Toplam ${Object.keys(selectedCountryLayers).length} farklı ülke boyandı. (Renk sayısı: ${colors.length})`;
         }
 
-        // Paylaşım görünümünde katman kontrolü oluşturma ve yönetme
         if (isShareView) {
-            // Katman kontrolü için container (sol üst köşe)
+            // Paylaşım modunda sol üstte katman kontrolü
             const layerControlContainer = L.DomUtil.create('div', 'layer-control-container leaflet-control');
             layerControlContainer.style.position = 'absolute';
             layerControlContainer.style.top = '10px';
             layerControlContainer.style.left = '10px';
             layerControlContainer.style.zIndex = 1100;
+            map.getContainer().appendChild(layerControlContainer);
 
-            // Katman kontrol başlığı
             const layerControlTitle = document.createElement('div');
             layerControlTitle.className = 'layer-control-title';
             layerControlTitle.textContent = 'Katmanlar';
             layerControlContainer.appendChild(layerControlTitle);
 
-            // OpenStreetMap altlık seçeneği
             const osmLayerControlItem = document.createElement('div');
             osmLayerControlItem.className = 'layer-control-item';
             const osmCheckbox = document.createElement('input');
@@ -680,32 +655,24 @@
             osmLayerControlItem.appendChild(osmLabel);
             layerControlContainer.appendChild(osmLayerControlItem);
 
-            // Renkli GeoJSON katmanları için kontrol (checkbox listesi)
             const geojsonLayersControlTitle = document.createElement('div');
             geojsonLayersControlTitle.style.marginTop = '10px';
             geojsonLayersControlTitle.style.fontWeight = 'bold';
             geojsonLayersControlTitle.textContent = 'Renkli GeoJSON Katmanları';
             layerControlContainer.appendChild(geojsonLayersControlTitle);
 
-            // GeoJSON katman checkbox container
             const geojsonCheckboxesContainer = document.createElement('div');
             geojsonCheckboxesContainer.style.maxHeight = '300px';
             geojsonCheckboxesContainer.style.overflowY = 'auto';
             layerControlContainer.appendChild(geojsonCheckboxesContainer);
 
-            // Katman kontrolü DOM'u haritaya ekle
-            map.getContainer().appendChild(layerControlContainer);
-
-            // GeoJSON katmanlarını tutan nesne
             const geojsonLayersMap = {};
 
-            // GeoJSON verisini yükle ve katmanları oluştur
             fetch('https://raw.githubusercontent.com/MEnesSevgi/altlik-harita/main/map%20(5).geojson')
                 .then(res => res.json())
                 .then(data => {
                     countriesGeoJSON = data;
 
-                    // GeoJSON'dan her ülke için ayrı katmanlar oluşturacağız
                     data.features.forEach((feature, index) => {
                         const countryId = getCountryId(feature);
 
@@ -721,7 +688,6 @@
 
                         geojsonLayersMap[countryId] = countryLayer;
 
-                        // Katman kontrolüne checkbox ekle
                         const layerControlItem = document.createElement('div');
                         layerControlItem.className = 'layer-control-item';
 
@@ -739,15 +705,13 @@
                         layerControlItem.appendChild(label);
                         geojsonCheckboxesContainer.appendChild(layerControlItem);
 
-                        // Checkbox değişikliklerinde haritayı güncelle
                         checkbox.addEventListener('change', () => {
                             updateMapLayers();
                         });
                     });
 
-                    // Paylaşım görünümünde config yükle ve katmanları seç
-                    let countriesToPaint = {};
                     const encodedConfig = urlParams.get('config');
+                    let countriesToPaint = {};
                     if (encodedConfig) {
                         countriesToPaint = loadMapConfig(encodedConfig);
                     }
@@ -756,7 +720,7 @@
                         Object.keys(countriesToPaint).forEach(countryId => {
                             const config = countriesToPaint[countryId];
                             if (config) {
-                                // Katman checkbox işaretle
+                                // Checkbox işaretle
                                 const checkbox = geojsonCheckboxesContainer.querySelector(`input[data-layer-id="${countryId}"]`);
                                 if (checkbox) checkbox.checked = true;
 
@@ -775,7 +739,6 @@
                         });
                     }
 
-                    // Başlangıçta OpenStreetMap ve seçili GeoJSON katmanlarını göster
                     updateMapLayers();
                 })
                 .catch(err => {
@@ -783,34 +746,23 @@
                     info.textContent = "Harita yüklenemedi.";
                 });
 
-            // Katmanları güncelleyen fonksiyon
             function updateMapLayers() {
-                // OpenStreetMap altlık kontrolü
                 if (osmCheckbox.checked) {
                     if (!map.hasLayer(osmTileLayer)) map.addLayer(osmTileLayer);
                 } else {
                     if (map.hasLayer(osmTileLayer)) map.removeLayer(osmTileLayer);
                 }
-
-                // GeoJSON katmanlarının kontrolü
                 geojsonLayersGroup.clearLayers();
-
-                geojsonCheckboxesContainer.querySelectorAll('input[type=checkbox]').forEach(checkbox => {
-                    if (checkbox.checked) {
-                        const layerId = checkbox.getAttribute('data-layer-id');
+                geojsonCheckboxesContainer.querySelectorAll('input[type=checkbox]').forEach(chk => {
+                    if (chk.checked) {
+                        const layerId = chk.getAttribute('data-layer-id');
                         const layer = geojsonLayersMap[layerId];
-                        if (layer) {
-                            geojsonLayersGroup.addLayer(layer);
-                        }
+                        if (layer) geojsonLayersGroup.addLayer(layer);
                     }
                 });
-
-                if (!map.hasLayer(geojsonLayersGroup)) {
-                    map.addLayer(geojsonLayersGroup);
-                }
+                if (!map.hasLayer(geojsonLayersGroup)) map.addLayer(geojsonLayersGroup);
             }
         } else {
-            // Normal modda: GeoJSON verisini yükle ve haritaya poligonları ekle, renk atama işlemi için
             fetch('https://raw.githubusercontent.com/MEnesSevgi/altlik-harita/main/map%20(5).geojson')
                 .then(res => res.json())
                 .then(data => {
@@ -857,7 +809,6 @@
 
             updateLegend();
             updateCountryEditList();
-            // OpenStreetMap altlık varsayılan olarak eklenir
             osmTileLayer.addTo(map);
         }
 
